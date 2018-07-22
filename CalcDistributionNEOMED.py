@@ -59,6 +59,7 @@ def calc_abundance():
 def find_total_elements(peptide):
     peplist = list(peptide)
     # 'key' : Sa,Ca,Na,Oa,Ha,Da(hellenstein)
+    Sp,Cp,Np,Op,Hp,Dp = 0,0,0,0,0,0
     AA_dict = {
         'G': [0,2,1,1,3,2.06],
         'A': [0,3,1,1,7,4],
@@ -85,7 +86,12 @@ def find_total_elements(peptide):
         'W': [0,11,2,1,10,0.08]
         }
     for i in peplist:
-        Sp,Cp,Np,Op,Hp,Dp += AA_dict[i][1], AA_dict[i][1], AA_dict[i][1], AA_dict[i][1], AA_dict[i][1], AA_dict[i][1]
+        Sp += AA_dict[i][0]
+        Cp += AA_dict[i][1]
+        Np += AA_dict[i][2]
+        Op += AA_dict[i][3]
+        Hp += AA_dict[i][4]
+        Dp += AA_dict[i][5]
     elements = [Sp,Cp,Np,Op,Hp,Dp]    
     return elements
 
