@@ -43,8 +43,9 @@ def find_mass(peptide):
 
 
 def calc_abundance(BWE = 0):
-    #this can be found on the web
-    #these abundances are given
+    """
+    % abundances
+    """
     X2, X13, X14, X16, X17, X18, X32, X33, X34 = 0.00015, 0.011074,0.99635,0.99759, 0.00037, 0.00204, 0.95,0.0076,0.0422
     X1, X12, X15, = 1-X2, 1-X13, 1-X14
     Y2, Y13, Y15, Y17, Y18, Y33, Y34 = X2/X1, X13/X12, X15/X14, X17/X16, X18/X16, X33/X32, X34/X32
@@ -119,6 +120,8 @@ def binomial_distribution(peptide,BWE,Ne, M10 = 0, M20 = 0):
         return M10,M20
     elif(Ne == '3'):
         #TO DO ....
+        for i in range(6):
+            M20 += (elements[i]*(elements[i]-1)*(elements[i]-2)*(abd[i]**3))/6
         return None
         
         
