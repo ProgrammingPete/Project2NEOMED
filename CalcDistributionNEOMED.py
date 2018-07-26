@@ -17,7 +17,10 @@ def prompt():
         print('This is an invalid input.')
         print('Please enter 1 or 0')
         selection = input('Enter your choice: ').strip()
-    return selection
+        
+    Ne = input('Please the intensity number to which to calculate binomial distribution ').strip()
+    BWE = input('Please enter BWE as a decimal: ').strip()
+    return selection, BWE, Ne
 
 def check_selection(selection):
     if selection == '1' or selection == '2':
@@ -38,26 +41,24 @@ def find_mass(peptide):
     #this association can be found within VB code ilchenko
     return totMass
 
-'''
-this is going to need more explanation. I need to know what Isotope/Isotope calcuation
-is called. 
-'''
-def calc_abundance():
+
+def calc_abundance(BWE = 0):
     #this can be found on the web
     #these abundances are given
     X2, X13, X14, X16, X17, X18, X32, X33, X34 = 0.00015, 0.011074,0.99635,0.99759, 0.00037, 0.00204, 0.95,0.0076,0.0422
     X1, X12, X15, = 1-X2, 1-X13, 1-X14
     Y2, Y13, Y15, Y17, Y18, Y33, Y34 = X2/X1, X13/X12, X15/X14, X17/X16, X18/X16, X33/X32, X34/X32
-    D2 = X1
+    
+    D2 = X2
     D1 = 1- D2
     YD2 = D2/D1
 
-    abundance = [Y2, Y13, Y15, Y17, Y18, Y33, Y34, YD2]
+    abundance = [Y2, Y13, Y15, Y17 ,YD2, Y33, Y18, Y34]
     return abundance
 
 
 def find_total_elements(peptide):
-    peplist = list(peptide)
+    peplist = list(peptide) #this creates an array of the characters
     # 'key' : Sa,Ca,Na,Oa,Ha,Da(hellenstein)
     Sp,Cp,Np,Op,Hp,Dp = 0,0,0,0,0,0
     AA_dict = {
@@ -92,25 +93,45 @@ def find_total_elements(peptide):
         Op += AA_dict[i][3]
         Hp += AA_dict[i][4]
         Dp += AA_dict[i][5]
-    elements = [Sp,Cp,Np,Op,Hp,Dp]    
+    elements = [Hp,Cp,Np,Op,Dp,Sp]   
     return elements
 
-def binomial_distribution(peptide):
+def binomial_distribution(peptide,BWE,Ne, M10 = 0, M20 = 0):
+    """ Comment:
+        This deals with a single peptide. If there are more than one,
+        this will loop. 
+    """
+    BWE = float(BWE)
     abd = calc_abundance()
-    tot_elements = find_total_elements(peptide)
-    return 
+    elements = find_total_elements(peptide)
+    
+    for i in range(6):
+        M10 += abd[i]*elements[i]
 
-def single_distribution(): #this is for debugging purposes
-    peptide = input('Please enter peptide: ').strip()
-    #BWE = input('Please enter BWE as a decimal: ').strip()
-    binomial_distribution(peptide)
+    if(Ne == '1'):
+        print(M10)
+        return M10
+    elif(Ne == '2'):
+        for i in range(6):
+            M20 += (elements[i]*(elements[i]-1)*(abd[i]**2))/2
+        M20 += elements[4]*abd[4]*M10
+        f'M10: {M10}, M20: {M20}'
+        return M10,M20
+    elif(Ne == '3'):
+        #TO DO ....
+        return None
+        
+        
+
+def single_distribution(BWE,Ne): #this is for debugging purposes
+    peptide = input('Please enter peptide: ').strip()    
+    binomial_distribution(peptide, BWE,Ne)   
     return
 
 def main():
-
-    selection = prompt()
+    selection, BWE, Ne  = prompt()
     if selection == '1':
-        single_distribution()
+        single_distribution(BWE, Ne)
     elif selection == '2':
         full_distribution()      
     
