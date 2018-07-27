@@ -20,6 +20,9 @@ def prompt():
         
     Ne = input('Please the intensity number to which to calculate binomial distribution ').strip()
     BWE = input('Please enter BWE as a decimal: ').strip()
+    while check_selection(Ne) == False:
+        print('Enter 0 or 1')
+        Ne = input('Enter the number of Isotopomers you want to use, up to three ').strip()
     return selection, BWE, Ne
 
 def check_selection(selection):
@@ -37,8 +40,9 @@ def find_folder():
 
 
 def find_mass(peptide):
-    #to_do: look up associated mass for each amino acid in the peptide, then find sum of these 
-    #this association can be found within VB code ilchenko
+    """
+    This is not actually needed within this program, it is only to check if all amino acids were included into the protein 
+    """
     return totMass
 
 
@@ -49,14 +53,59 @@ def calc_abundance(BWE = 0):
     X2, X13, X14, X16, X17, X18, X32, X33, X34 = 0.00015, 0.011074,0.99635,0.99759, 0.00037, 0.00204, 0.95,0.0076,0.0422
     X1, X12, X15, = 1-X2, 1-X13, 1-X14
     Y2, Y13, Y15, Y17, Y18, Y33, Y34 = X2/X1, X13/X12, X15/X14, X17/X16, X18/X16, X33/X32, X34/X32
-    
-    D2 = X2
+    if(BWE ==0):
+        D2 = X2        
+    else:
+        D2 = BWE
     D1 = 1- D2
     YD2 = D2/D1
-
-    abundance = [Y2, Y13, Y15, Y17 ,YD2, Y33, Y18, Y34]
+    abundance = [Y2, Y13, Y15, Y17 , Y33,YD2, Y18, Y34]
     return abundance
 
+def calc_totLabel(M10, M20, M30):
+    """
+    this calculates the total labeling given M10,M20,M30....
+    1- sum(m0 to m2)/ sum(m1 to m2)
+
+    Ne is not needed due to the fact that the excluded distributions will be 0 by default (defined in binomial_distribution() arguments)
+    """
+    msumD = 1 + M10+ M20 + M30
+    totalLabel = 1 - ((M10+ M20+ M30)/ msumD)
+    return totalLabel
+    
+def calc_plateau(Y0, P, Ne, elements, BWE):
+    hp = elements[0] - elements[5]  #hp defined by total H minus Dp
+    elements[0] = hp                #this is then passsed into the elements  list as such
+    abd = calc_abundance(BWE)
+    #abd[0] is YD0 in Visual Basic, and abd[5] is YD2 
+    YD0 = abd[0]
+    YD2 = abd[5]
+    #calculate beta
+    beta = 0
+    for i in range(5):
+        beta += elements[i]*abd[i]
+    #calculate gamma
+    gamma = 0
+    for i in range(5):
+        gamma += elements[i]*(elements[i]-1)*((abd[i])**2)
+    #calculate omega
+    omega = 0
+    #calculate sigma 
+    sigma = 0
+    
+    #plat1 is the denominator to the equation
+    if(Ne == 1):
+        plat1 = N*(YD0-YD2)
+    elif(Ne == 2):
+        plat1 = N*(YD2 - YD0)*(1+beta+((N-1)/2)*(YD2-YD0))
+    elif(N == 3):
+        plat1 = N*(YD2-YD0)*(1)
+    elif(N == 4):
+        
+        
+
+    Plat = 1-1/(1/(1-Y0)+plat1)
+    return Plat
 
 def find_total_elements(peptide):
     peplist = list(peptide) #this creates an array of the characters
@@ -72,7 +121,7 @@ def find_total_elements(peptide):
         'C': [1,3,1,1,5,1.62],
         'c': [1,5,2,2,6,1.62],
         'L': [0,6,1,1,11,0.6],
-        'l': [0,6,1,1,11,1], #this may be either lowercase L or I
+        'I': [0,6,1,1,11,1],
         'N': [0,4,2,2,6,1.89],
         'O': [0,5,2,1,10,1],
         'D': [0,4,1,3,5,1.89],
@@ -94,41 +143,52 @@ def find_total_elements(peptide):
         Op += AA_dict[i][3]
         Hp += AA_dict[i][4]
         Dp += AA_dict[i][5]
-    elements = [Hp,Cp,Np,Op,Dp,Sp]   
+    elements = [Hp,Cp,Np,Op,Sp, Dp]   
     return elements
 
-def binomial_distribution(peptide,BWE,Ne, M10 = 0, M20 = 0):
+def binomial_distribution(peptide,Ne, elements, BWE = 0, M10 = 0, M20 = 0, M30 = 0, M40 = 0):
     """ Comment:
         This deals with a single peptide. If there are more than one,
         this will loop. 
     """
     BWE = float(BWE)
-    abd = calc_abundance()
-    elements = find_total_elements(peptide)
-    
+    abd = calc_abundance(BWE)
+    m202, m203 = 0, 0;
     for i in range(6):
         M10 += abd[i]*elements[i]
 
     if(Ne == '1'):
         print(M10)
-        return M10
+        return M10,M20,M30
     elif(Ne == '2'):
         for i in range(6):
             M20 += (elements[i]*(elements[i]-1)*(abd[i]**2))/2
-        M20 += elements[4]*abd[4]*M10
+        for i in range(6):
+            m202 += abd[i]*elements[i]
+            for j in range(6):
+                m203 += abd[j+i+1]*elements[j+i+1]
+            m202 = m202*m203
+        M20 += m202
         f'M10: {M10}, M20: {M20}'
-        return M10,M20
+        return M10,M20,M30
     elif(Ne == '3'):
         #TO DO ....
         for i in range(6):
             M20 += (elements[i]*(elements[i]-1)*(elements[i]-2)*(abd[i]**3))/6
-        return None
-        
-        
+        return M10,M20,M30
+    
+def single_peptide(peptide,Ne):
+    elements = find_total_elements(peptide)                               #find total elements in a peptide
+    M10, M20, M30 = binomial_distribution(peptide,Ne, elements)           #calculate distribution at start
+    TL0 = calc_totLabel(M10 , M20, M30)                                   #calcualte TL at start
+    M10, M20, M30 = binomial_distribution(peptide ,Ne, elements,BWE)      #calculate distribution at Plateau
+    TL2 = calc_totLabel(M10, M20, M30)                                    #calculate TL at plateau
+    calc_plateau(TL0, TL2, Ne, elements,BWE)                              #calculate plateau using Y0 (TL0)
+    return
 
 def single_distribution(BWE,Ne): #this is for debugging purposes
     peptide = input('Please enter peptide: ').strip()    
-    binomial_distribution(peptide, BWE,Ne)   
+    single_peptide(peptide, Ne)    
     return
 
 def main():
