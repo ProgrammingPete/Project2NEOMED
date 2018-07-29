@@ -8,9 +8,9 @@ import tkinter.filedialog
 
 def prompt():
     print('Please choose an option from the list:')
-    print('1. Find the binomial distribution for a single peptide')
+    print('1. Find the binomial distribution for a single peptide [DEBUGGING PURPOSES]')
     print('2. Find the binomial distribution for all peptides within an experiment')
-    print('Please enter 1 or 0')
+    print('Please enter 1 or 2')
     selection = input('Enter your choice: ').strip()
     while check_selection(selection) == False:
         print('\n')
@@ -18,11 +18,11 @@ def prompt():
         print('Please enter 1 or 0')
         selection = input('Enter your choice: ').strip()
         
-    Ne = input('Please the intensity number to which to calculate binomial distribution ').strip()
-    BWE = input('Please enter BWE as a decimal: ').strip()
+    Ne = input('Enter the number of Isotopomers you want to use, up to two: ').strip()    
     while check_selection(Ne) == False:
-        print('Enter 0 or 1')
-        Ne = input('Enter the number of Isotopomers you want to use, up to three ').strip()
+        print('Enter 1 or 2')
+        Ne = input('Enter the number of Isotopomers you want to use, up to three: ').strip()
+    BWE = input('Please enter BWE as a decimal: ').strip()    
     return selection, BWE, Ne
 
 def check_selection(selection):
@@ -35,7 +35,7 @@ def find_folder():
     Tk().withdraw()
     print("Please select a directory.")
     folder_name = tkinter.filedialog.askdirectory(initialdir = os.getcwd(), title= "Please select a directory that contains your files")    
-    print("You choice is %s" % folder_name)
+    print("Your choice is %s" % folder_name)
     return folder_name
 
 
@@ -50,6 +50,7 @@ def calc_abundance(BWE = 0):
     """
     % abundances
     """
+    BWE = float(BWE)
     X2, X13, X14, X16, X17, X18, X32, X33, X34 = 0.00015, 0.011074,0.99635,0.99759, 0.00037, 0.00204, 0.95,0.0076,0.0422
     X1, X12, X15, = 1-X2, 1-X13, 1-X14
     Y2, Y13, Y15, Y17, Y18, Y33, Y34 = X2/X1, X13/X12, X15/X14, X17/X16, X18/X16, X33/X32, X34/X32
@@ -74,8 +75,10 @@ def calc_totLabel(M10, M20, M30):
     return totalLabel
     
 def calc_plateau(Y0, P, Ne, elements, BWE):
-    hp = elements[0] - elements[5]  #hp defined by total H minus Dp
-    elements[0] = hp                #this is then passsed into the elements  list as such
+    N = elements[5]
+    hp = elements[0] - N  #hp defined by total H minus Dp
+    hp0 = elements[0]               #save original value of hp0
+    elements[0] = hp                #this is then passed into the elements  list as such
     abd = calc_abundance(BWE)
     #abd[0] is YD0 in Visual Basic, and abd[5] is YD2 
     YD0 = abd[0]
@@ -90,26 +93,34 @@ def calc_plateau(Y0, P, Ne, elements, BWE):
         gamma += elements[i]*(elements[i]-1)*((abd[i])**2)
     #calculate omega
     omega = 0
+    for i in range(4):
+        if(i == 1):
+            continue
+        else:
+            omega += elements[1]*abd[1]*elements[i]*abd[i]
     #calculate sigma 
     sigma = 0
+    sigma= elements[3]*abd[6] + elements[4]*abd[7] + elements[3]*abd[3]*elements[4]*abd[4] + omega
     
     #plat1 is the denominator to the equation
-    if(Ne == 1):
+    if(Ne == '1'):
         plat1 = N*(YD0-YD2)
-    elif(Ne == 2):
+    elif(Ne == '2'):
         plat1 = N*(YD2 - YD0)*(1+beta+((N-1)/2)*(YD2-YD0))
-    elif(N == 3):
-        plat1 = N*(YD2-YD0)*(1)
-    elif(N == 4):
-        
-        
-
+    elif(N == '3'):
+        plat1 = N*(YD2-YD0)*(1+(gamma/2)+sigma+((N-1)/2)*(YD2-YD0)*(1+beta)+(N-1)*(N-2)*(YD2**2 + YD2*YD0)/6)
+    elif(N == '4'):
+        pass
+    
     Plat = 1-1/(1/(1-Y0)+plat1)
+    elements[0] = hp0 # restore back to original Hp 
     return Plat
 
 def find_total_elements(peptide):
+    """
+        'key' : Sa,Ca,Na,Oa,Ha,Da(hellenstein). this is theoretical values given the amino acid code
+    """
     peplist = list(peptide) #this creates an array of the characters
-    # 'key' : Sa,Ca,Na,Oa,Ha,Da(hellenstein)
     Sp,Cp,Np,Op,Hp,Dp = 0,0,0,0,0,0
     AA_dict = {
         'G': [0,2,1,1,3,2.06],
@@ -151,9 +162,9 @@ def binomial_distribution(peptide,Ne, elements, BWE = 0, M10 = 0, M20 = 0, M30 =
         This deals with a single peptide. If there are more than one,
         this will loop. 
     """
-    BWE = float(BWE)
+    
     abd = calc_abundance(BWE)
-    m202, m203 = 0, 0;
+    m202, m203 = 0, 0
     for i in range(6):
         M10 += abd[i]*elements[i]
 
@@ -165,11 +176,10 @@ def binomial_distribution(peptide,Ne, elements, BWE = 0, M10 = 0, M20 = 0, M30 =
             M20 += (elements[i]*(elements[i]-1)*(abd[i]**2))/2
         for i in range(6):
             m202 += abd[i]*elements[i]
-            for j in range(6):
-                m203 += abd[j+i+1]*elements[j+i+1]
+            for j in range(1+i,6):
+                m203 += abd[j]*elements[j]
             m202 = m202*m203
-        M20 += m202
-        f'M10: {M10}, M20: {M20}'
+        M20 += m202 + elements[3]*abd[6]+elements[4]*abd[7]
         return M10,M20,M30
     elif(Ne == '3'):
         #TO DO ....
@@ -177,18 +187,25 @@ def binomial_distribution(peptide,Ne, elements, BWE = 0, M10 = 0, M20 = 0, M30 =
             M20 += (elements[i]*(elements[i]-1)*(elements[i]-2)*(abd[i]**3))/6
         return M10,M20,M30
     
-def single_peptide(peptide,Ne):
+def single_peptide(peptide,Ne, BWE):
     elements = find_total_elements(peptide)                               #find total elements in a peptide
     M10, M20, M30 = binomial_distribution(peptide,Ne, elements)           #calculate distribution at start
+    print("M10 at Start: ", M10)
+    print("M20 at Start: ", M20)
     TL0 = calc_totLabel(M10 , M20, M30)                                   #calcualte TL at start
-    M10, M20, M30 = binomial_distribution(peptide ,Ne, elements,BWE)      #calculate distribution at Plateau
+    M10, M20, M30 = binomial_distribution(peptide ,Ne, elements,BWE)      #calculate distribution at Plateau BWE.. elements become overwritten
+    print("M10 at Plateau (BWE): ", M10)
+    print("M20 at Plateau (BWE): ", M20)
     TL2 = calc_totLabel(M10, M20, M30)                                    #calculate TL at plateau
-    calc_plateau(TL0, TL2, Ne, elements,BWE)                              #calculate plateau using Y0 (TL0)
+    theoryPlat = calc_plateau(TL0, TL2, Ne, elements,BWE)                 #calculate theory plateau... elements become overwritten
+
+    #find expirement data
+    #using this data, find the plateau
     return
 
 def single_distribution(BWE,Ne): #this is for debugging purposes
     peptide = input('Please enter peptide: ').strip()    
-    single_peptide(peptide, Ne)    
+    single_peptide(peptide, Ne, BWE)    
     return
 
 def main():
@@ -197,8 +214,6 @@ def main():
         single_distribution(BWE, Ne)
     elif selection == '2':
         full_distribution()      
-    
-    
     
 
 
