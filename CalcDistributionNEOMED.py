@@ -32,16 +32,44 @@ def check_selection(selection):
         return False
     
 def find_folder():
-    Tk().withdraw()
+    window = Tk()    
     print("Please select a directory.")
     folder_name = tkinter.filedialog.askdirectory(initialdir = os.getcwd(), title= "Please select a directory that contains your files")    
     print("Your choice is %s" % folder_name)
+    window.withdraw()
     return folder_name
+
+def read_file(folder_name):
+    needed_data = []
+    for file_name in os.listdir(folder_name): #this creates a list from the directory (list of specimens) 
+        file_name_split = file_name.split('.')        
+        if len(file_name_split) < 2:
+            pass
+        elif file_name_split[1] == 'Quant':
+            
+            needed_data.append(file_name_split[0])
+            #extract peptide names
+            file_path = os.path.sep.join([folder_name,file_name])
+            with open(file_path) as file:
+                hitpeptides = False
+                for row in file:
+                    row = row.split(',')
+                    if hitpeptides == True:
+                        needed_data.append(row[0])                        
+                    if row[0] == 'Peptide':
+                        hitpeptides = True
+                        continue                       
+            needed_data.append('\n')  # this is to specify end of specimen
+        else:
+            pass
+    print('Done reading')
+    return needed_data        
 
 
 def find_mass(peptide):
     """
-    This is not actually needed within this program, it is only to check if all amino acids were included into the protein 
+    This is not actually needed within this program,
+    it is only to check if all amino acids were included into the protein 
     """
     return totMass
 
@@ -128,7 +156,7 @@ def find_total_elements(peptide):
         'S': [0,3,1,2,5,2.61],
         'P': [0,5,1,1,7,2.59],
         'V': [0,5,1,1,9,0.42],
-        'T': [0,4,1,7,0.2],
+        'T': [0,4,1,2,7,0.2],
         'C': [1,3,1,1,5,1.62],
         'c': [1,5,2,2,6,1.62],
         'L': [0,6,1,1,11,0.6],
@@ -148,12 +176,17 @@ def find_total_elements(peptide):
         'W': [0,11,2,1,10,0.08]
         }
     for i in peplist:
-        Sp += AA_dict[i][0]
-        Cp += AA_dict[i][1]
-        Np += AA_dict[i][2]
-        Op += AA_dict[i][3]
-        Hp += AA_dict[i][4]
-        Dp += AA_dict[i][5]
+        try:
+            Sp += AA_dict[i][0]
+            Cp += AA_dict[i][1]
+            Np += AA_dict[i][2]
+            Op += AA_dict[i][3]
+            Hp += AA_dict[i][4]
+            Dp += AA_dict[i][5]
+        except KeyError:
+            print("Key not found, skipping:", i)
+            print("Continuing")
+            pass
     elements = [Hp,Cp,Np,Op,Sp, Dp]   
     return elements
 
@@ -188,6 +221,7 @@ def binomial_distribution(peptide,Ne, elements, BWE = 0, M10 = 0, M20 = 0, M30 =
         return M10,M20,M30
     
 def single_peptide(peptide,Ne, BWE):
+    print(peptide)
     elements = find_total_elements(peptide)                               #find total elements in a peptide
     M10, M20, M30 = binomial_distribution(peptide,Ne, elements)           #calculate distribution at start
     print("M10 at Start: ", M10)
@@ -208,12 +242,33 @@ def single_distribution(BWE,Ne): #this is for debugging purposes
     single_peptide(peptide, Ne, BWE)    
     return
 
+def full_distribution(BWE, Ne):
+    #use a queue for iteration 
+    from collections import deque
+    peptide = ''
+    folder_name = find_folder()
+    needed_data = read_file(folder_name)
+    Queue = deque(needed_data)
+
+    print('Finding values for:', Queue.popleft())
+    while(len(Queue) != 0 ):
+        peptide = Queue.popleft()
+        if (len(Queue) == 1):
+            continue
+        elif(peptide == '\n'):
+            print('Finding values for:', Queue.popleft())
+            continue
+        peptide.strip()
+        #single_peptide(peptide, Ne, BWE)       
+        
+    return
+
 def main():
     selection, BWE, Ne  = prompt()
     if selection == '1':
         single_distribution(BWE, Ne)
     elif selection == '2':
-        full_distribution()      
+        full_distribution(BWE, Ne)      
     
 
 
