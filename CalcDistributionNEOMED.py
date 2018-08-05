@@ -21,8 +21,8 @@ def prompt():
     Ne = input('Enter the number of Isotopomers you want to use, up to two: ').strip()    
     while check_selection(Ne) == False:
         print('Enter 1 or 2')
-        Ne = input('Enter the number of Isotopomers you want to use, up to three: ').strip()
-    BWE = input('Please enter BWE as a decimal: ').strip()    
+        Ne = input('Enter the number of Isotopomers you want to use, up to two: ').strip()
+    #BWE = input('Please enter BWE as a decimal: ').strip()    
     return selection, BWE, Ne
 
 def check_selection(selection):
@@ -39,30 +39,24 @@ def find_folder():
     window.withdraw()
     return folder_name
 
-def read_file(folder_name):
+def read_wb(file_path, num_of_cells):
+    from openpyzl import load_workbook
+    wb = load_workbook(filename = filepath)
+    ws = wb.active
+
+def read_folder(folder_name):
     needed_data = []
-    for file_name in os.listdir(folder_name): #this creates a list from the directory (list of specimens) 
+    for file_name in os.listdir(folder_name): #this creates a list from the directory (list of specimens)
         file_name_split = file_name.split('.')        
-        if len(file_name_split) < 2:
-            pass
-        elif file_name_split[1] == 'Quant':
-            
-            needed_data.append(file_name_split[0])
             #extract peptide names
-            file_path = os.path.sep.join([folder_name,file_name])
-            with open(file_path) as file:
-                hitpeptides = False
-                for row in file:
-                    row = row.split(',')
-                    if hitpeptides == True:
-                        needed_data.append(row[0])                        
-                    if row[0] == 'Peptide':
-                        hitpeptides = True
-                        continue                       
-            needed_data.append('\n')  # this is to specify end of specimen
-        else:
-            pass
-    print('Done reading')
+        file_path = os.path.sep.join([folder_name,file_name])
+        with open(file_path) as file:
+            for row in file:
+                row = row.split(',')
+                if row[0] == 'time':
+                   needed_data = read_wb(filepath, len(row))
+                   break
+        needed_data.append('\n')  # this is to specify end of specimen
     return needed_data        
 
 
@@ -102,7 +96,7 @@ def calc_totLabel(M10, M20, M30):
     totalLabel = 1 - ((M10+ M20+ M30)/ msumD)
     return totalLabel
     
-def calc_plateau(Y0, P, Ne, elements, BWE):
+def calc_plateau(Y0, Ne, elements, BWE):
     N = elements[5]
     hp = elements[0] - N  #hp defined by total H minus Dp
     hp0 = elements[0]               #save original value of hp0
@@ -223,7 +217,7 @@ def binomial_distribution(peptide,Ne, elements, BWE = 0, M10 = 0, M20 = 0, M30 =
 def single_peptide(peptide,Ne, BWE):
     print(peptide)
     elements = find_total_elements(peptide)                               #find total elements in a peptide
-    M10, M20, M30 = binomial_distribution(peptide,Ne, elements)           #calculate distribution at start
+    M10, M20, M30 = binomial_distribution(peptide,Ne, elements)           #calculate distribution at start Y0
     print("M10 at Start: ", M10)
     print("M20 at Start: ", M20)
     TL0 = calc_totLabel(M10 , M20, M30)                                   #calcualte TL at start
@@ -231,14 +225,15 @@ def single_peptide(peptide,Ne, BWE):
     print("M10 at Plateau (BWE): ", M10)
     print("M20 at Plateau (BWE): ", M20)
     TL2 = calc_totLabel(M10, M20, M30)                                    #calculate TL at plateau
-    theoryPlat = calc_plateau(TL0, TL2, Ne, elements,BWE)                 #calculate theory plateau... elements become overwritten
+    theoryPlat = calc_plateau(TL0, Ne, elements,BWE)                 #calculate theory plateau... elements become overwritten. This is using hellisten N
 
     #find expirement data
     #using this data, find the plateau
     return
 
-def single_distribution(BWE,Ne): #this is for debugging purposes
-    peptide = input('Please enter peptide: ').strip()    
+def single_distribution(Ne): #this is for debugging purposes
+    peptide = input('Please enter peptide: ').strip()
+    BWE = input('Please Enter BWE as a decimal: ').strip()
     single_peptide(peptide, Ne, BWE)    
     return
 
@@ -251,10 +246,10 @@ def full_distribution(BWE, Ne):
     Queue = deque(needed_data)
 
     print('Finding values for:', Queue.popleft())
-    while(len(Queue) != 0 ):
+    while True:
         peptide = Queue.popleft()
         if (len(Queue) == 1):
-            continue
+            break
         elif(peptide == '\n'):
             print('Finding values for:', Queue.popleft())
             continue
@@ -264,9 +259,9 @@ def full_distribution(BWE, Ne):
     return
 
 def main():
-    selection, BWE, Ne  = prompt()
+    selection, Ne  = prompt()
     if selection == '1':
-        single_distribution(BWE, Ne)
+        single_distribution(Ne)
     elif selection == '2':
         full_distribution(BWE, Ne)      
     
