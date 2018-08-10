@@ -1,16 +1,21 @@
 import os
 import csv
 import openpyxl
+import numpy
 from tkinter import *
 import tkinter.filedialog
 
 
 
 def prompt():
+    print('This program will calculate the rate constant (k) using two time points with N hellistein,'
+          ' k using two time points with experimental N, binomial distribution, and plateau with corresponding N.'
+          'also total labeling. Output is to an excel file. ')
     print('Please choose an option from the list:')
-    print('1. Find the binomial distribution for a single peptide [DEBUGGING PURPOSES]')
-    print('2. Find the binomial distribution for all peptides within an experiment')
-    print('Please enter 1 or 2')
+    print('1. Find these values for a single peptide [DEBUGGING PURPOSES]')
+    print('2. Find these values for all petides in the given file with bwe included. ')
+    print('3. Find these values for all peptides with manually entered BWE')
+    print('Please enter 1, 2 or 3')
     selection = input('Enter your choice: ').strip()
     while check_selection(selection) == False:
         print('\n')
@@ -22,14 +27,16 @@ def prompt():
     while check_selection(Ne) == False:
         print('Enter 1 or 2')
         Ne = input('Enter the number of Isotopomers you want to use, up to two: ').strip()
-    #BWE = input('Please enter BWE as a decimal: ').strip()    
-    return selection, BWE, Ne
+    #BWE = input('Please enter BWE as a decimal: ').strip()
+    ExpN = input('Enter the Experimental N data Separated by a comma')
+    return selection, BWE, Ne, ExpN
 
 def check_selection(selection):
-    if selection == '1' or selection == '2':
+    if selection == '1' or selection == '2' or selection == '3':
         return True
     else:
         return False
+    
     
 def find_folder():
     window = Tk()    
@@ -44,7 +51,7 @@ def read_wb(file_path, num_of_cells):
     wb = load_workbook(filename = filepath)
     ws = wb.active
 
-def read_folder(folder_name):
+def read_file(folder_name):
     needed_data = []
     for file_name in os.listdir(folder_name): #this creates a list from the directory (list of specimens)
         file_name_split = file_name.split('.')        
@@ -67,6 +74,19 @@ def find_mass(peptide):
     """
     return totMass
 
+def calc_k(t, Y1, Y0, P):
+    """
+    Calculate the rate constant k using:
+
+    t = time of selected Y point
+    Y1 = select Y point
+    Y0 = Y value at time 0
+    P = plateau, be either Plateau at Hellinsten N or New N from experiment  
+    """
+    
+    k = 0
+    k = -1/(t*numpy.log(1-(Y1-Y0)/(P-Y0)))
+    return k
 
 def calc_abundance(BWE = 0):
     """
@@ -96,8 +116,8 @@ def calc_totLabel(M10, M20, M30):
     totalLabel = 1 - ((M10+ M20+ M30)/ msumD)
     return totalLabel
     
-def calc_plateau(Y0, Ne, elements, BWE):
-    N = elements[5]
+def calc_plateau(Y0, Ne, elements, BWE, N = 0):
+    #N = elements[5]
     hp = elements[0] - N  #hp defined by total H minus Dp
     hp0 = elements[0]               #save original value of hp0
     elements[0] = hp                #this is then passed into the elements  list as such
@@ -140,34 +160,36 @@ def calc_plateau(Y0, Ne, elements, BWE):
 
 def find_total_elements(peptide):
     """
-        'key' : Sa,Ca,Na,Oa,Ha,Da(hellenstein). this is theoretical values given the amino acid code
+        'key' : Sa,Ca,Na,Oa,Ha,Da(hellenstein), expDa (Experiment). This is theoretical values given the amino acid code
+        expN: the list of experimental N from experiment
     """
+    
     peplist = list(peptide) #this creates an array of the characters
-    Sp,Cp,Np,Op,Hp,Dp = 0,0,0,0,0,0
+    Sp,Cp,Np,Op,Hp,Dp, expDa = 0,0,0,0,0,0
     AA_dict = {
-        'G': [0,2,1,1,3,2.06],
-        'A': [0,3,1,1,7,4],
-        'S': [0,3,1,2,5,2.61],
-        'P': [0,5,1,1,7,2.59],
-        'V': [0,5,1,1,9,0.42],
-        'T': [0,4,1,2,7,0.2],
-        'C': [1,3,1,1,5,1.62],
-        'c': [1,5,2,2,6,1.62],
-        'L': [0,6,1,1,11,0.6],
-        'I': [0,6,1,1,11,1],
-        'N': [0,4,2,2,6,1.89],
+        'G': [0,2,1,1,3,2.06,1.530],
+        'A': [0,3,1,1,7,4,3.560],
+        'S': [0,3,1,2,5,2.61,1.763],
+        'P': [0,5,1,1,7,2.59,0.848],
+        'V': [0,5,1,1,9,0.42,0.519],
+        'T': [0,4,1,2,7,0.2,0.261],
+        'C': [1,3,1,1,5,1.62,1.589],
+        'c': [1,5,2,2,6,1.62, 1.589],  #no given value for c in excel table, assuming the same
+        'L': [0,6,1,1,11,0.6,0.434],
+        'I': [0,6,1,1,11,1,0.846],
+        'N': [0,4,2,2,6,1.89,0.921],
         'O': [0,5,2,1,10,1],
-        'D': [0,4,1,3,5,1.89],
-        'Q': [0,5,2,2,8,3.95],
-        'K': [0,6,2,1,12,0.54],
-        'E': [0,5,1,3,7,3.95],
-        'M': [1,5,1,1,9,1.12],
-        'm': [1,5,1,2,9,1.12],
-        'H': [0,9,1,1,9,0.32],
-        'F': [0,6,4,1,12,3.43],
-        'R': [0,6,4,1,12,3.43],
-        'Y': [0,9,1,2,9,0.42],
-        'W': [0,11,2,1,10,0.08]
+        'D': [0,4,1,3,5,1.89,2.087],
+        'Q': [0,5,2,2,8,3.95,2.812],
+        'K': [0,6,2,1,12,0.54,0.245],
+        'E': [0,5,1,3,7,3.95,3.365],
+        'M': [1,5,1,1,9,1.12,0.865],
+        'm': [1,5,1,2,9,1.12,0.865],    #no given value for c in excel table, assuming the same
+        'H': [0,9,1,1,9,0.32,1.555],
+        'F': [0,6,4,1,12,3.43, 0.284],
+        'R': [0,6,4,1,12,3.43,1.835],
+        'Y': [0,9,1,2,9,0.42, 0.381],
+        'W': [0,11,2,1,10,0.08, 0.219]
         }
     for i in peplist:
         try:
@@ -177,11 +199,12 @@ def find_total_elements(peptide):
             Op += AA_dict[i][3]
             Hp += AA_dict[i][4]
             Dp += AA_dict[i][5]
+            expDa += AA_dict[i][6]
         except KeyError:
             print("Key not found, skipping:", i)
             print("Continuing")
             pass
-    elements = [Hp,Cp,Np,Op,Sp, Dp]   
+    elements = [Hp,Cp,Np,Op,Sp, Dp,expDa]   
     return elements
 
 def binomial_distribution(peptide,Ne, elements, BWE = 0, M10 = 0, M20 = 0, M30 = 0, M40 = 0):
@@ -214,7 +237,9 @@ def binomial_distribution(peptide,Ne, elements, BWE = 0, M10 = 0, M20 = 0, M30 =
             M20 += (elements[i]*(elements[i]-1)*(elements[i]-2)*(abd[i]**3))/6
         return M10,M20,M30
     
-def single_peptide(peptide,Ne, BWE):
+def single_peptide(peptide,Ne, BWE, data = None):
+    if data is None:
+        data = []
     print(peptide)
     elements = find_total_elements(peptide)                               #find total elements in a peptide
     M10, M20, M30 = binomial_distribution(peptide,Ne, elements)           #calculate distribution at start Y0
@@ -225,10 +250,16 @@ def single_peptide(peptide,Ne, BWE):
     print("M10 at Plateau (BWE): ", M10)
     print("M20 at Plateau (BWE): ", M20)
     TL2 = calc_totLabel(M10, M20, M30)                                    #calculate TL at plateau
-    theoryPlat = calc_plateau(TL0, Ne, elements,BWE)                 #calculate theory plateau... elements become overwritten. This is using hellisten N
-
-    #find expirement data
-    #using this data, find the plateau
+    if data == []:
+        theoryPlat = calc_plateau(TL0, Ne, elements,BWE, elements[5])                 #calculate theory plateau... elements become overwritten. This is using hellisten N (elements[5])
+    elif:
+        #experimental data will be in structure "data" argument
+        #using this data, find the plateau. this will need to include Y0 value form experiment, Y1 (corersponds to t value)
+        Y0, Y1, t = data
+        PlateauNhell = calc_plateau(Y0, Ne, elements, BWE, elements[5])
+        PlateauNexp = calc_plateau(Y0, Ne, elements, BWE, elements[6])    #elements[6] is the sum of N from experiment
+        kNhell = calc_k(t, Y1, Y0, PlateauNhell)
+        kexpN = calc_k(t, Y1, Y0, PlateauNnexp)
     return
 
 def single_distribution(Ne): #this is for debugging purposes
@@ -237,33 +268,30 @@ def single_distribution(Ne): #this is for debugging purposes
     single_peptide(peptide, Ne, BWE)    
     return
 
-def full_distribution(BWE, Ne):
-    #use a queue for iteration 
-    from collections import deque
+def full_distribution_fileBWE(Ne): #does not work yet
+    #use a queue for iteration (possibly)
+    #from collections import deque
+    BWE = None#will be in file... not sure how to handle this yet
     peptide = ''
-    folder_name = find_folder()
-    needed_data = read_file(folder_name)
-    Queue = deque(needed_data)
+    data = find_data()
+    single_peptide(peptide, Ne, BWE, data)
+    return
 
-    print('Finding values for:', Queue.popleft())
-    while True:
-        peptide = Queue.popleft()
-        if (len(Queue) == 1):
-            break
-        elif(peptide == '\n'):
-            print('Finding values for:', Queue.popleft())
-            continue
-        peptide.strip()
-        #single_peptide(peptide, Ne, BWE)       
-        
+def full_distribution_file(Ne):
+    BWE = input('Please Enter BWE as a decimal: ').strip()
+    peptide = ''
+    data = find_data()
+    single_peptide(peptide, Ne, BWE, data)
     return
 
 def main():
-    selection, Ne  = prompt()
+    selection, Ne, ExpN  = prompt()
     if selection == '1':
         single_distribution(Ne)
     elif selection == '2':
-        full_distribution(BWE, Ne)      
+        full_distribution_fileBWE(Ne)
+    elif selection == '3':
+        full_distribution_file(Ne)
     
 
 
