@@ -28,8 +28,7 @@ def prompt():
         print('Enter 1 or 2')
         Ne = input('Enter the number of Isotopomers you want to use, up to two: ').strip()
     #BWE = input('Please enter BWE as a decimal: ').strip()
-    ExpN = input('Enter the Experimental N data Separated by a comma')
-    return selection, BWE, Ne, ExpN
+    return selection, Ne
 
 def check_selection(selection):
     if selection == '1' or selection == '2' or selection == '3':
@@ -46,13 +45,36 @@ def find_folder():
     window.withdraw()
     return folder_name
 
-def read_wb(file_path, num_of_cells):
-    from openpyzl import load_workbook
-    wb = load_workbook(filename = filepath)
-    ws = wb.active
+def read_csv(file_path, columns): #latest task here (NOT WORKING)
+    """
+    From the CSV file given from read_file(), this will generate the Peptides dictionary
+    The first key is the time points from the experiment
+    """
+    pepDict = dict()
+    temp_list = list()
+    with open(file_path, 'r') as csvfile:
+        CSVReader = csv.reader(csvfile)
+        for rCount, row in enumerate(CSVReader):
+            if rCount == 0:
+                peptide_list = row
+                for count in peptide_list:
+                   pepDict[count] = []               
+            else:
+                for i, peptide in enumerate(peptide_list):
+                    if row[i] == '':
+                        pass
+                    else:
+                        pepDict[peptide].append(row[i])
+    print(pepDict)            
+    return pepDict
 
 def read_file(folder_name):
+    """
+    This will find the csv file where the first cell value is equal to A1.
+    Program will exit if not found
+    """
     needed_data = []
+    A1 = 'time'
     for file_name in os.listdir(folder_name): #this creates a list from the directory (list of specimens)
         file_name_split = file_name.split('.')        
             #extract peptide names
@@ -60,11 +82,16 @@ def read_file(folder_name):
         with open(file_path) as file:
             for row in file:
                 row = row.split(',')
-                if row[0] == 'time':
-                   needed_data = read_wb(filepath, len(row))
-                   break
-        needed_data.append('\n')  # this is to specify end of specimen
-    return needed_data        
+                if row[0] == A1:
+                    pepDict = read_csv(file_path, len(row))
+                    break
+                else:
+                    print("File: {0} is not the correct file".format(file_path))
+    else:
+        print("The correct file was not found in this directory.")
+        print('The file\'s first box (A1 in excel), needs to start with {0}'.format(A1))
+        exit(0)
+    return PepDict        
 
 
 def find_mass(peptide):
@@ -108,7 +135,7 @@ def calc_abundance(BWE = 0):
 def calc_totLabel(M10, M20, M30):
     """
     this calculates the total labeling given M10,M20,M30....
-    1- sum(m0 to m2)/ sum(m1 to m2)
+    1- sum(m0 to m2) / sum(m1 to m2)
 
     Ne is not needed due to the fact that the excluded distributions will be 0 by default (defined in binomial_distribution() arguments)
     """
@@ -161,11 +188,11 @@ def calc_plateau(Y0, Ne, elements, BWE, N = 0):
 def find_total_elements(peptide):
     """
         'key' : Sa,Ca,Na,Oa,Ha,Da(hellenstein), expDa (Experiment). This is theoretical values given the amino acid code
-        expN: the list of experimental N from experiment
+        expDa: the list of experimental N from experiment
     """
     
     peplist = list(peptide) #this creates an array of the characters
-    Sp,Cp,Np,Op,Hp,Dp, expDa = 0,0,0,0,0,0
+    Sp,Cp,Np,Op,Hp,Dp, expDa = 0,0,0,0,0,0,0
     AA_dict = {
         'G': [0,2,1,1,3,2.06,1.530],
         'A': [0,3,1,1,7,4,3.560],
@@ -208,11 +235,7 @@ def find_total_elements(peptide):
     return elements
 
 def binomial_distribution(peptide,Ne, elements, BWE = 0, M10 = 0, M20 = 0, M30 = 0, M40 = 0):
-    """ Comment:
-        This deals with a single peptide. If there are more than one,
-        this will loop. 
-    """
-    
+        
     abd = calc_abundance(BWE)
     m202, m203 = 0, 0
     for i in range(6):
@@ -238,8 +261,11 @@ def binomial_distribution(peptide,Ne, elements, BWE = 0, M10 = 0, M20 = 0, M30 =
         return M10,M20,M30
     
 def single_peptide(peptide,Ne, BWE, data = None):
-    if data is None:
-        data = []
+    """ Comment:
+        This deals with a single peptide. If there are more than one,
+        this will loop. 
+    """
+    
     print(peptide)
     elements = find_total_elements(peptide)                               #find total elements in a peptide
     M10, M20, M30 = binomial_distribution(peptide,Ne, elements)           #calculate distribution at start Y0
@@ -250,9 +276,10 @@ def single_peptide(peptide,Ne, BWE, data = None):
     print("M10 at Plateau (BWE): ", M10)
     print("M20 at Plateau (BWE): ", M20)
     TL2 = calc_totLabel(M10, M20, M30)                                    #calculate TL at plateau
-    if data == []:
+    if data is None:
+        data = []
         theoryPlat = calc_plateau(TL0, Ne, elements,BWE, elements[5])                 #calculate theory plateau... elements become overwritten. This is using hellisten N (elements[5])
-    elif:
+    else:
         #experimental data will be in structure "data" argument
         #using this data, find the plateau. this will need to include Y0 value form experiment, Y1 (corersponds to t value)
         Y0, Y1, t = data
@@ -262,30 +289,43 @@ def single_peptide(peptide,Ne, BWE, data = None):
         kexpN = calc_k(t, Y1, Y0, PlateauNnexp)
     return
 
-def single_distribution(Ne): #this is for debugging purposes
+def single_distribution(Ne):
+    """
+    This is for debugging purposes. 
+    """
     peptide = input('Please enter peptide: ').strip()
     BWE = input('Please Enter BWE as a decimal: ').strip()
     single_peptide(peptide, Ne, BWE)    
     return
 
 def full_distribution_fileBWE(Ne): #does not work yet
+    """
+    This method takes the needed data from the excel file and places it
+    into the <iterable> data. The data will include: Peptide names, 
+    """
     #use a queue for iteration (possibly)
     #from collections import deque
     BWE = None#will be in file... not sure how to handle this yet
     peptide = ''
-    data = find_data()
+    folder_name = find_folder()
+    data = read_file(folder_name)
     single_peptide(peptide, Ne, BWE, data)
     return
 
 def full_distribution_file(Ne):
+    """
+    This message uses the full distribution method, but without the BWE from
+    the excel file. 
+    """
     BWE = input('Please Enter BWE as a decimal: ').strip()
     peptide = ''
-    data = find_data()
+    folder_name = find_folder()
+    data = read_file(folder_name)
     single_peptide(peptide, Ne, BWE, data)
     return
 
 def main():
-    selection, Ne, ExpN  = prompt()
+    selection, Ne = prompt()
     if selection == '1':
         single_distribution(Ne)
     elif selection == '2':
