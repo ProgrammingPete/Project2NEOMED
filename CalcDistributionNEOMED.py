@@ -45,10 +45,10 @@ def find_folder():
     window.withdraw()
     return folder_name
 
-def read_csv(file_path, columns): #latest task here (NOT WORKING)
+def read_csv(file_path): #latest task here (NOT WORKING)
     """
     From the CSV file given from read_file(), this will generate the Peptides dictionary
-    The first key is the time points from the experiment
+    The first key is the time points from the experiment.
     """
     pepDict = dict()
     temp_list = list()
@@ -56,42 +56,39 @@ def read_csv(file_path, columns): #latest task here (NOT WORKING)
         CSVReader = csv.reader(csvfile)
         for rCount, row in enumerate(CSVReader):
             if rCount == 0:
-                peptide_list = row
-                for count in peptide_list:
+                first_row = row
+                for count in first_row:
                    pepDict[count] = []               
             else:
-                for i, peptide in enumerate(peptide_list):
+                for i, peptide in enumerate(first_row):
                     if row[i] == '':
                         pass
                     else:
                         pepDict[peptide].append(row[i])
-    print(pepDict)            
-    return pepDict
+    #print(pepDict)            
+    return first_row, pepDict
 
 def read_file(folder_name):
     """
     This will find the csv file where the first cell value is equal to A1.
-    Program will exit if not found
+    Program will throw error if not found
     """
-    needed_data = []
+    file_count = int(0) 
     A1 = 'time'
     for file_name in os.listdir(folder_name): #this creates a list from the directory (list of specimens)
-        file_name_split = file_name.split('.')        
-            #extract peptide names
-        file_path = os.path.sep.join([folder_name,file_name])
-        with open(file_path) as file:
-            for row in file:
-                row = row.split(',')
-                if row[0] == A1:
-                    pepDict = read_csv(file_path, len(row))
-                    break
-                else:
-                    print("File: {0} is not the correct file".format(file_path))
-    else:
-        print("The correct file was not found in this directory.")
-        print('The file\'s first box (A1 in excel), needs to start with {0}'.format(A1))
-        exit(0)
-    return PepDict        
+        file_name_split = file_name.split('.')
+        if file_name_split[1] == "csv" and file_count == 0:            
+            file_path = os.path.sep.join([folder_name,file_name])
+            with open(file_path) as file:
+                file_count += 1
+                for row in file:
+                    row = row.split(',')
+                    if row[0] == A1:
+                        first_row, pepDict = read_csv(file_path)
+                        break
+                    else:
+                        print("File: {0} is not the correct file".format(file_path))    
+    return first_row, pepDict        
 
 
 def find_mass(peptide):
@@ -99,7 +96,7 @@ def find_mass(peptide):
     This is not actually needed within this program,
     it is only to check if all amino acids were included into the protein 
     """
-    return totMass
+    return 
 
 def calc_k(t, Y1, Y0, P):
     """
@@ -110,7 +107,7 @@ def calc_k(t, Y1, Y0, P):
     Y0 = Y value at time 0
     P = plateau, be either Plateau at Hellinsten N or New N from experiment  
     """
-    
+    t = float(t)
     k = 0
     k = -1/(t*numpy.log(1-(Y1-Y0)/(P-Y0)))
     return k
@@ -123,7 +120,7 @@ def calc_abundance(BWE = 0):
     X2, X13, X14, X16, X17, X18, X32, X33, X34 = 0.00015, 0.011074,0.99635,0.99759, 0.00037, 0.00204, 0.95,0.0076,0.0422
     X1, X12, X15, = 1-X2, 1-X13, 1-X14
     Y2, Y13, Y15, Y17, Y18, Y33, Y34 = X2/X1, X13/X12, X15/X14, X17/X16, X18/X16, X33/X32, X34/X32
-    if(BWE ==0):
+    if(BWE ==0.0):
         D2 = X2        
     else:
         D2 = BWE
@@ -187,8 +184,9 @@ def calc_plateau(Y0, Ne, elements, BWE, N = 0):
 
 def find_total_elements(peptide):
     """
-        'key' : Sa,Ca,Na,Oa,Ha,Da(hellenstein), expDa (Experiment). This is theoretical values given the amino acid code
-        expDa: the list of experimental N from experiment
+        'key' : Sa,Ca,Na,Oa,Ha,Da(hellenstein), expDa (Experiment).
+        This is theoretical values- given the amino acid code
+        expDa- the list of experimental N from experiment
     """
     
     peplist = list(peptide) #this creates an array of the characters
@@ -229,7 +227,6 @@ def find_total_elements(peptide):
             expDa += AA_dict[i][6]
         except KeyError:
             print("Key not found, skipping:", i)
-            print("Continuing")
             pass
     elements = [Hp,Cp,Np,Op,Sp, Dp,expDa]   
     return elements
@@ -257,10 +254,10 @@ def binomial_distribution(peptide,Ne, elements, BWE = 0, M10 = 0, M20 = 0, M30 =
     elif(Ne == '3'):
         #TO DO ....
         for i in range(6):
-            M20 += (elements[i]*(elements[i]-1)*(elements[i]-2)*(abd[i]**3))/6
+            M30 += (elements[i]*(elements[i]-1)*(elements[i]-2)*(abd[i]**3))/6
         return M10,M20,M30
     
-def single_peptide(peptide,Ne, BWE, data = None):
+def single_peptide(peptide,Ne, BWE, data = None, t = 0, index = 0):
     """ Comment:
         This deals with a single peptide. If there are more than one,
         this will loop. 
@@ -279,15 +276,18 @@ def single_peptide(peptide,Ne, BWE, data = None):
     if data is None:
         data = []
         theoryPlat = calc_plateau(TL0, Ne, elements,BWE, elements[5])                 #calculate theory plateau... elements become overwritten. This is using hellisten N (elements[5])
+        return 
     else:
-        #experimental data will be in structure "data" argument
+        #experimental peptide data will be in structure "data" argument
         #using this data, find the plateau. this will need to include Y0 value form experiment, Y1 (corersponds to t value)
-        Y0, Y1, t = data
+        Y0 = (float(data[0]) + float(data[1]))/2
+        Y1 = (float(data[index]) + float(data[index+1]))/2
         PlateauNhell = calc_plateau(Y0, Ne, elements, BWE, elements[5])
         PlateauNexp = calc_plateau(Y0, Ne, elements, BWE, elements[6])    #elements[6] is the sum of N from experiment
         kNhell = calc_k(t, Y1, Y0, PlateauNhell)
-        kexpN = calc_k(t, Y1, Y0, PlateauNnexp)
-    return
+        kexpN = calc_k(t, Y1, Y0, PlateauNexp)
+        print('rate/Y0Nhell: {0}, rate/newN: {1}'.format(kNhell,kexpN))
+        return 
 
 def single_distribution(Ne):
     """
@@ -298,18 +298,21 @@ def single_distribution(Ne):
     single_peptide(peptide, Ne, BWE)    
     return
 
-def full_distribution_fileBWE(Ne): #does not work yet
+def full_distribution_fileBWE(Ne): 
     """
-    This method takes the needed data from the excel file and places it
-    into the <iterable> data. The data will include: Peptide names, 
+    This method takes the data from pepDict and runs single_peptide() for each peptide
+    in the peptide_list. More details on how these values are found are in
+    read_file().
+    ------------DOES NOT WORK YET---------------
     """
-    #use a queue for iteration (possibly)
-    #from collections import deque
     BWE = None#will be in file... not sure how to handle this yet
-    peptide = ''
     folder_name = find_folder()
-    data = read_file(folder_name)
-    single_peptide(peptide, Ne, BWE, data)
+    first_row, pepDict = read_file(folder_name)
+    peptide_list = first_row[1:]
+    t = input('Type in hours the timpoint to use: ').strip()
+    index = pepdict['time'].index(t)
+    for peptide in peptide_list:
+        single_peptide(peptide, Ne, BWE, pepDict[peptide], t, index)
     return
 
 def full_distribution_file(Ne):
@@ -318,10 +321,13 @@ def full_distribution_file(Ne):
     the excel file. 
     """
     BWE = input('Please Enter BWE as a decimal: ').strip()
-    peptide = ''
     folder_name = find_folder()
-    data = read_file(folder_name)
-    single_peptide(peptide, Ne, BWE, data)
+    first_row, pepDict = read_file(folder_name)
+    peptide_list = first_row[1:]
+    t = input('Type in hours the timpoint to use (t): ').strip()
+    index = pepDict['time'].index(t)
+    for peptide in peptide_list:
+        single_peptide(peptide, Ne, BWE, pepDict[peptide], t, index)
     return
 
 def main():
