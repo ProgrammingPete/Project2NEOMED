@@ -116,7 +116,11 @@ def calc_abundance(BWE = 0):
     """
     % abundances
     """
-    BWE = float(BWE)
+    try:
+        BWE = float(BWE)
+    except ValueError:
+        print("BWE was not a decimal! Please retry")
+        
     X2, X13, X14, X16, X17, X18, X32, X33, X34 = 0.00015, 0.011074,0.99635,0.99759, 0.00037, 0.00204, 0.95,0.0076,0.0422
     X1, X12, X15 = 1-X2, 1-X13, 1-X14
     Y2, Y13, Y15, Y17, Y18, Y33, Y34 = X2/X1, X13/X12, X15/X14, X17/X16, X18/X16, X33/X32, X34/X32
@@ -173,7 +177,7 @@ def calc_plateau(Y0, Ne, elements, BWE, N = 0):
     if(Ne == '1'):
         plat1 = N*(YD0-YD2)
     elif(Ne == '2'):
-        plat1 = N*(YD2 - YD0)*(1+beta+((N-1)/2)*(YD2-YD0))
+        plat1 = N*(YD2 - YD0)*(1+beta+((N-1)/2)*(YD2+YD0))
     elif(N == '3'):
         plat1 = N*(YD2-YD0)(1+beta+gamma+ ((N-1)/2)*(YD2+YD0)+((N-1)/6)*(YD2**2+YD2*YD0+YD0**2))
         #plat1 = N*(YD2-YD0)*(1+(gamma/2)+sigma+((N-1)/2)*(YD2-YD0)*(1+beta)+(N-1)*(N-2)*(YD2**2 + YD2*YD0)/6)
@@ -243,15 +247,20 @@ def binomial_distribution(peptide,Ne, elements, BWE = 0, M10 = 0, M20 = 0, M30 =
     abd = calc_abundance(BWE)
     m202, m203, m204, m205 = 0, 0, 0, 0
     print('abundance = {0}'.format(abd))    
+
+    try:
+        Ne = float(Ne)
+    except ValueError:
+        print("Ne was not a integer! Please retry")
         
     for i in range(6):
         M10 += abd[i]*elements[i]
 
-    if(Ne == '1'):
+    if(Ne >= 1):
         print(M10)
         elements[0] = y0
         return M10,M20,M30
-    elif(Ne == '2'):
+    elif(Ne >= 2):
         for i in range(6):
             M20 += (elements[i]*(elements[i]-1)*(abd[i]**2))/2
                    
@@ -264,10 +273,36 @@ def binomial_distribution(peptide,Ne, elements, BWE = 0, M10 = 0, M20 = 0, M30 =
         
         elements[0] = y0        
         return M10,M20,M30
-    elif(Ne == '3'):
+    elif(Ne >= 3):
         #TO DO ....
+        m303,m302,m301 = 0,0,0
         for i in range(6):
-            M30 += (elements[i]*(elements[i]-1)*(elements[i]-2)*(abd[i]**3))/6
+            m303 += (elements[i]*(elements[i]-1)*(elements[i]-2)*(abd[i]**3))/6
+        m303 = m303 + elements[3]*(elements[3]-1)*abd[3]*abd[6] + elements[4]*(elements[4]-1)*abd[4]*abd[7]
+
+        m302 = elements[0]*(elements[0]-1)*(abd[0]**2)*(abd[1]*elements[1]+abd[2]*elements[2]+abd[3]*elements[3]+abd[4]*elements[4]+abd[5]*elements[5])
+        m302 += elements[1]*(elements[1]-1)*(abd[1]**2)*(abd[0]*elements[0]+abd[2]*elements[2]+abd[3]*elements[3]+abd[4]*elements[4]+abd[5]*elements[5])
+        m302 += elements[2]*(elements[2]-1)*(abd[2]**2)*(abd[0]*elements[0]+abd[1]*elements[1]+abd[3]*elements[3]+abd[4]*elements[4]+abd[5]*elements[5])
+        m302 += elements[3]*(elements[3]-1)*(abd[3]**2)*(abd[0]*elements[0]+abd[1]*elements[1]+abd[2]*elements[2]+abd[4]*elements[4]+abd[5]*elements[5])
+        m302 += elements[4]*(elements[4]-1)*(abd[4]**2)*(abd[0]*elements[0]+abd[1]*elements[1]+abd[2]*elements[2]+abd[3]*elements[3]+abd[5]*elements[5])
+        m302 += elements[5]*(elements[5]-1)*(abd[5]**2)*(abd[0]*elements[0]+abd[1]*elements[1]+abd[2]*elements[2]+abd[3]*elements[3]+abd[4]*elements[4])
+        m302 = m302/2
+
+        for i in range(6):
+            if i == 3 or i == 4:
+                pass
+            else:
+                m301 += (abd[6]*elements[3]+abd[7]*elements[4])*(abd[i]*elements[i])
+                
+        m301 += abd[3]*elements[3]*abd[7]*elements[4]+abd[6]*elements[3]*abd[4]*elements[4]
+                
+        m301 += abd[0]*elements[0]*abd[5]*elements[5]*(abd[1]*elements[1]+ abd[2]*elements[2]+abd[4]*elements[4])
+        m301 += abd[1]*elements[1]*abd[5]*elements[5]*(abd[2]*elements[2]+ abd[2]*elements[2]+abd[4]*elements[4])
+        m301 += abd[1]*elements[1]*abd[0]*elements[0]*(abd[2]*elements[2]+ abd[3]*elements[3]+abd[4]*elements[4])
+        m301 += abd[1]*elements[1]*abd[2]*elements[2]*(abd[3]*elements[3]+ abd[4]*elements[4]) #questioning this line
+        m301 += abd[0]*elements[0]*abd[2]*elements[2]*(abd[3]*elements[3]+ abd[5]*elements[5])
+        m301 += abd[5]*elements[5]*abd[2]*elements[2]*(abd[3]*elements[3]+ abd[4]*elements[4]+abd[0]*elements[0])
+        
         elements[0] = y0
         return M10,M20,M30
     
@@ -284,10 +319,12 @@ def single_peptide(peptide,Ne, BWE, data = None, t = 0, index = 0):
     M10, M20, M30 = binomial_distribution(peptide,Ne, elements)           #calculate distribution at start Y0
     print("M10 at Start: ", M10)
     print("M20 at Start: ", M20)
+    print("M30 at Start: ", M30)
     TL0 = calc_totLabel(M10 , M20, M30)                                   #calcualte TL at start
     M10, M20, M30 = binomial_distribution(peptide ,Ne, elements,BWE)      #calculate distribution at Plateau BWE.. elements become overwritten
     print("M10 at Plateau (BWE): ", M10)
     print("M20 at Plateau (BWE): ", M20)
+    print("M30 at Plateau (BWE): ", M30)
     TL2 = calc_totLabel(M10, M20, M30)                                    #calculate TL at plateau
     print('TL0 at time 0: {0}, TL2 at plataeu: {1}'.format(TL0,TL2))
     if data is None:
